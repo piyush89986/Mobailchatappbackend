@@ -22,9 +22,12 @@ const corsOptions = {
     if (!origin) return callback(null, true);
     const requestOrigin = normalizeOrigin(origin);
     const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(requestOrigin);
+    const isVercelOrRender = requestOrigin.includes('vercel.app') || requestOrigin.includes('onrender.com');
+
     if (
       process.env.NODE_ENV !== 'production' ||
       isLocalhost ||
+      isVercelOrRender ||
       allowedOrigins.length === 0 ||
       allowedOrigins.includes(requestOrigin)
     ) {

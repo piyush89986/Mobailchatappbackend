@@ -33,6 +33,8 @@ export const accessChat = async (req, res) => {
 
         let newChat = await chatModel.create({
             members: [myId, receiverId],
+            status: "pending",
+            requestedBy: myId
         });
 
         let fullChat = await chatModel.findById(newChat._id)
@@ -42,6 +44,45 @@ export const accessChat = async (req, res) => {
         fullChat.reciver = receiver;
         res.status(201).json(new ServerResponse(true, fullChat, "Chat created", null));
 
+    } catch (error) {
+        res.status(500).json(new ServerResponse(false, null, error.message, error));
+    }
+};
+
+/**
+ * Accept Chat Request (Instagram Style)
+ */
+export const acceptChatRequest = async (req, res) => {
+    const { chatId } = req.params;
+    try {
+        const chat = await chatModel.findByIdAndUpdate(
+            chatId,
+            { status: "accepted" },
+            { new: true }
+        ).populate("members", "_id user_name email phone avatar bio").lean();
+
+        if (!chat) {
+            return res.status(404).json(new ServerResponse(false, null, "Chat not found", null));
+        }
+
+        res.json(new ServerResponse(true, chat, "Message request accepted", null));
+    } catch (error) {
+        res.status(500).json(new ServerResponse(false, null, error.message, error));
+    }
+};
+
+/**
+ * Decline Chat Request
+ */
+export const declineChatRequest = async (req, res) => {
+    const { chatId } = req.params;
+    try {
+        await chatModel.findByIdAndUpdate(
+            chatId,
+            { status: "declined" }
+        );
+
+        res.json(new ServerResponse(true, null, "Message request declined", null));
     } catch (error) {
         res.status(500).json(new ServerResponse(false, null, error.message, error));
     }
@@ -64,6 +105,7 @@ export const createGroupChat = async (req, res) => {
             isGroupChat: true,
             groupName: groupName || "New Group",
             groupAdmin: req.user.id,
+            status: "accepted",
             groupIcon: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(groupName || 'group')}`
         });
 
@@ -85,6 +127,7 @@ export const getMyChats = async (req, res) => {
     try {
         let chats = await chatModel.find({
             members: req.user.id,
+            status: { $ne: "declined" }
         })
             .populate("members", "_id user_name email phone avatar bio")
             .populate({
@@ -104,17 +147,18 @@ export const getMyChats = async (req, res) => {
  * Send Message
  */
 export const sendMessage = async (req, res) => {
-    const { chatId, message } = req.body;
+    const { chatId, message, attachment } = req.body;
 
     try {
-        if (!chatId || !message || message.trim() === "") {
-            return res.status(400).json(new ServerResponse(false, null, "chatId and message are required", null));
+        if (!chatId || (!message && !attachment)) {
+            return res.status(400).json(new ServerResponse(false, null, "chatId and message or attachment are required", null));
         }
 
         let getMessage = await MessageModel.create({
             chatId,
             sender: req.user.id,
-            message: message.trim(),
+            message: message ? message.trim() : "",
+            attechment: attachment ? [attachment] : []
         });
 
         await chatModel.findByIdAndUpdate(chatId, {

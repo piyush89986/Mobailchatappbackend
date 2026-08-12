@@ -6,16 +6,21 @@ import {
   getMyChats,
   sendMessage,
   getMessages,
+  acceptChatRequest,
+  declineChatRequest,
 } from "../contollers/chat.controller.js";
 
 const router = express.Router();
 
-router.use("/", authMiddlewareOnlyForUser)
+router.use("/", authMiddlewareOnlyForUser);
 
 router.post("/access", accessChat);
 router.post("/group", createGroupChat);
 router.get("/", getMyChats);
 router.post("/send-message", sendMessage);
 router.get("/m/:chatId/", getMessages);
+router.patch("/accept/:chatId", acceptChatRequest);
+router.delete("/decline/:chatId", declineChatRequest);
 
 export default router;
+

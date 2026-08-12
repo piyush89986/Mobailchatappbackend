@@ -41,6 +41,19 @@ const chatSchema = new Schema(
             ref: "messages",
         },
 
+        // chat request status (for Instagram style requests)
+        status: {
+            type: String,
+            enum: ["pending", "accepted", "declined"],
+            default: "accepted", // group chats & existing default to accepted, 1-on-1 set to pending if new
+        },
+
+        // user who initiated the chat request
+        requestedBy: {
+            type: Schema.Types.ObjectId,
+            ref: "users",
+        },
+
         // unread count per user
         unreadCounts: [
             {
