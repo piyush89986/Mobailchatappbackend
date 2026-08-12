@@ -10,7 +10,16 @@ export default async function dbConnect() {
         const client = await connect(mongoUri);
 
         if (client) {
-            console.log("Database Connected Successfully")
+            console.log("Database Connected Successfully");
+            // Safely drop stale legacy index if present
+            try {
+                const db = client.connection.db;
+                if (db) {
+                    await db.collection("users").dropIndex("licenseNumber_1").catch(() => {});
+                }
+            } catch (err) {
+                // Ignore if collection or index doesn't exist
+            }
         }
 
     } catch (error) {

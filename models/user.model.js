@@ -22,14 +22,9 @@ const userSchema = new Schema({
         unique: true
     },
     phone: {
-        type: Number,
+        type: String,
+        trim: true,
         required: [true, "Phone Number is Required"],
-        validate: {
-            validator: function (v) {
-                return /^(\+91[\-\s]?)?[0]?(91)?[6-9]\d{9}$/.test(v)
-            },
-            message: props => `${props.value} is Not a Valid Phone Number`
-        },
         unique: true
     },
     password: {
@@ -40,7 +35,7 @@ const userSchema = new Schema({
         type: String,
         trim: true,
         minLength: [3, "Invalid Address"],
-        maxLength: [32, "Invalid Address"]
+        maxLength: [100, "Invalid Address"]
     },
     gender: {
         type: String,
@@ -49,8 +44,8 @@ const userSchema = new Schema({
     bio: {
         type: String,
         trim: true,
-        maxLength: [32, "Invalid Address"],
-        default: "Hi There I am using Chat App"
+        maxLength: [255, "Bio is too long"],
+        default: "Hi there! I am using Chat App"
     },
     avatar: {
         type: String,

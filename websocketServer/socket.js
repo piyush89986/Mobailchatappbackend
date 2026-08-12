@@ -11,45 +11,66 @@ export default function InitSocket(server) {
 
     io = new Server(server, {
         cors: {
-            origin: allowedOrigins.length ? allowedOrigins : true,
+            origin: true,
             credentials: true,
         }
     });
 
-    io.on("connection", (socket) => {
+    const onlineUsers = new Map(); // userId -> socketId
 
+    io.on("connection", (socket) => {
         console.log(socket.id + " socket connected");
 
-        // user join room
+        // user register online status
         socket.on("join", (userId) => {
-            socket.join(userId)
+            if (userId) {
+                socket.join(userId);
+                onlineUsers.set(userId, socket.id);
+                io.emit("getOnlineUsers", Array.from(onlineUsers.keys()));
+            }
         });
 
-        // join chat room
+        // join specific chat room
         socket.on("chatroom", (chatId) => {
-            socket.join(chatId)
+            if (chatId) {
+                socket.join(chatId);
+            }
         });
 
         // typing indicator
-        socket.on("typing", (chatId) => {
-            socket.to(chatId).emit("typing");
+        socket.on("typing", ({ chatId, userId, userName }) => {
+            if (chatId) {
+                socket.to(chatId).emit("typing", { chatId, userId, userName });
+            }
         });
 
-        socket.on("stopTyping", (chatId) => {
-            socket.to(chatId).emit("stopTyping");
+        socket.on("stopTyping", ({ chatId, userId }) => {
+            if (chatId) {
+                socket.to(chatId).emit("stopTyping", { chatId, userId });
+            }
         });
 
         socket.on("messageDelivered", async ({ messageId, userId, chatId }) => {
-            await messageModel.findByIdAndUpdate(messageId, {
-                delivered: true,
-                $addToSet: { seen: userId },
-            });
-
-            socket.to(chatId).emit("deliverd", { messageId, userId, chatId ,message : "delivered"})
+            if (messageId && userId) {
+                await messageModel.findByIdAndUpdate(messageId, {
+                    delivered: true,
+                    $addToSet: { seen: userId },
+                });
+                if (chatId) {
+                    socket.to(chatId).emit("delivered", { messageId, userId, chatId, message: "delivered" });
+                }
+            }
         });
 
         socket.on("disconnect", (reason) => {
-            console.log(reason + " socket disconnected");
+            console.log(socket.id + " disconnected: " + reason);
+            for (let [userId, sockId] of onlineUsers.entries()) {
+                if (sockId === socket.id) {
+                    onlineUsers.delete(userId);
+                    break;
+                }
+            }
+            io.emit("getOnlineUsers", Array.from(onlineUsers.keys()));
         });
     });
 

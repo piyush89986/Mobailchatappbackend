@@ -19,10 +19,15 @@ const allowedOrigins = process.env.CORS_ORIGIN
   : [];
 const corsOptions = {
   origin(origin, callback) {
-    // Allow server-to-server tools and health checks without origin header.
     if (!origin) return callback(null, true);
     const requestOrigin = normalizeOrigin(origin);
-    if (allowedOrigins.length === 0 || allowedOrigins.includes(requestOrigin)) {
+    const isLocalhost = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(requestOrigin);
+    if (
+      process.env.NODE_ENV !== 'production' ||
+      isLocalhost ||
+      allowedOrigins.length === 0 ||
+      allowedOrigins.includes(requestOrigin)
+    ) {
       return callback(null, true);
     }
     return callback(new Error('Not allowed by CORS'));

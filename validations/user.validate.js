@@ -3,8 +3,8 @@ import { body } from "express-validator";
 export const registerUserValidator = [
     body("user_name")
         .trim()
-        .notEmpty().withMessage("User Name is required")
-        .isLength({ min: 2, max: 32 }).withMessage("User Name must be 2-32 characters"),
+        .notEmpty().withMessage("Full Name is required")
+        .isLength({ min: 2, max: 50 }).withMessage("Full Name must be 2-50 characters"),
 
     body("email")
         .trim()
@@ -12,9 +12,10 @@ export const registerUserValidator = [
         .isEmail().withMessage("Invalid email format"),
 
     body("phone")
+        .trim()
         .notEmpty().withMessage("Phone number is required")
-        .matches(/^(\+91[\-\s]?)?[0]?(91)?[6-9]\d{9}$/)
-        .withMessage("Invalid Indian phone number"),
+        .matches(/^[+]*[(]?[0-9]{1,4}[)]?[-\s./0-9]*$/)
+        .withMessage("Invalid phone number format"),
 
     body("password")
         .notEmpty().withMessage("Password is required")
@@ -23,7 +24,7 @@ export const registerUserValidator = [
     body("address")
         .optional()
         .trim()
-        .isLength({ min: 3, max: 32 }).withMessage("Address must be 3-32 characters"),
+        .isLength({ min: 3, max: 100 }).withMessage("Address must be 3-100 characters"),
 
     body("gender")
         .optional()
@@ -32,7 +33,7 @@ export const registerUserValidator = [
     body("bio")
         .optional()
         .trim()
-        .isLength({ max: 32 }).withMessage("Bio can't exceed 32 characters")
+        .isLength({ max: 255 }).withMessage("Bio can't exceed 255 characters")
 ];
 
 

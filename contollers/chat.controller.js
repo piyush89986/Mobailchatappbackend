@@ -9,33 +9,38 @@ export const accessChat = async (req, res) => {
     const { receiverId } = req.body;
     const myId = req.user.id;
     try {
-
         if (!receiverId) {
             return res.status(400).json(new ServerResponse(false, null, "receiverId required", null));
         }
 
-        let reciver = await userModel.findById(receiverId).select("user_name _id phone email avatar").lean();
+        let receiver = await userModel.findById(receiverId).select("user_name _id phone email avatar bio").lean();
+        if (!receiver) {
+            return res.status(404).json(new ServerResponse(false, null, "Recipient user not found", null));
+        }
 
         let chat = await chatModel.findOne({
             isGroupChat: false,
             members: { $all: [myId, receiverId], $size: 2 },
         })
-            .populate("members", "_id user_name email phone avatar")
+            .populate("members", "_id user_name email phone avatar bio")
             .populate("lastMessage")
             .lean();
 
-
         if (chat) {
-            chat.reciver = reciver;
-            return res.status(200).json(new ServerResponse(true, chat, "success", null));
+            chat.reciver = receiver;
+            return res.status(200).json(new ServerResponse(true, chat, "Chat retrieved", null));
         }
 
-        const newChat = await chatModel.create({
+        let newChat = await chatModel.create({
             members: [myId, receiverId],
         });
 
-        newChat.reciver = reciver;
-        res.status(201).json(new ServerResponse(true, newChat, "chat created", null));
+        let fullChat = await chatModel.findById(newChat._id)
+            .populate("members", "_id user_name email phone avatar bio")
+            .lean();
+
+        fullChat.reciver = receiver;
+        res.status(201).json(new ServerResponse(true, fullChat, "Chat created", null));
 
     } catch (error) {
         res.status(500).json(new ServerResponse(false, null, error.message, error));
@@ -48,20 +53,25 @@ export const accessChat = async (req, res) => {
 export const createGroupChat = async (req, res) => {
     const { members, groupName } = req.body;
 
-    if (!members || members.length < 2) {
-        return res.status(400).json(new ServerResponse(false, null, "At least 2 users required", null));
+    if (!members || !Array.isArray(members) || members.length < 1) {
+        return res.status(400).json(new ServerResponse(false, null, "At least 1 other user required to create a group", null));
     }
 
     try {
-
+        const uniqueMembers = [...new Set([...members, req.user.id])];
         const groupChat = await chatModel.create({
-            members: [...members, req.user.id],
+            members: uniqueMembers,
             isGroupChat: true,
-            groupName,
+            groupName: groupName || "New Group",
             groupAdmin: req.user.id,
+            groupIcon: `https://api.dicebear.com/7.x/identicon/svg?seed=${encodeURIComponent(groupName || 'group')}`
         });
 
-        res.status(201).json(new ServerResponse(true, groupChat, "success", null));
+        const fullGroupChat = await chatModel.findById(groupChat._id)
+            .populate("members", "_id user_name email phone avatar bio")
+            .lean();
+
+        res.status(201).json(new ServerResponse(true, fullGroupChat, "Group chat created successfully", null));
 
     } catch (error) {
         res.status(500).json(new ServerResponse(false, null, error.message, error));
@@ -76,7 +86,7 @@ export const getMyChats = async (req, res) => {
         let chats = await chatModel.find({
             members: req.user.id,
         })
-            .populate("members", "_id user_name email phone avatar")
+            .populate("members", "_id user_name email phone avatar bio")
             .populate({
                 path: "lastMessage",
                 select: "sender message createdAt delivered seen",
@@ -84,12 +94,11 @@ export const getMyChats = async (req, res) => {
             .sort({ updatedAt: -1 })
             .lean();
 
-        res.json(new ServerResponse(true, chats, "success", null));
+        res.json(new ServerResponse(true, chats, "Chats fetched successfully", null));
     } catch (error) {
         res.status(500).json(new ServerResponse(false, null, error.message, error));
     }
 };
-
 
 /**
  * Send Message
@@ -98,11 +107,14 @@ export const sendMessage = async (req, res) => {
     const { chatId, message } = req.body;
 
     try {
+        if (!chatId || !message || message.trim() === "") {
+            return res.status(400).json(new ServerResponse(false, null, "chatId and message are required", null));
+        }
 
         let getMessage = await MessageModel.create({
             chatId,
             sender: req.user.id,
-            message,
+            message: message.trim(),
         });
 
         await chatModel.findByIdAndUpdate(chatId, {
@@ -110,15 +122,14 @@ export const sendMessage = async (req, res) => {
         });
 
         getMessage = getMessage.toObject();
-
-        getMessage.sender = req.userData
+        getMessage.sender = req.userData || { _id: req.user.id };
 
         let io = getIo();
+        if (io) {
+            io.to(chatId).emit("newMessage", getMessage);
+        }
 
-        io.to(chatId).emit("newMessage", getMessage);
-
-
-        res.status(201).json(new ServerResponse(true, getMessage, "message Sent", null));
+        res.status(201).json(new ServerResponse(true, getMessage, "Message sent", null));
 
     } catch (error) {
         res.status(500).json(new ServerResponse(false, null, error.message, error));
@@ -130,18 +141,18 @@ export const sendMessage = async (req, res) => {
  */
 export const getMessages = async (req, res) => {
     const { chatId } = req.params;
-    const limit = Math.min(parseInt(req.query.limit, 10) || 50, 100);
+    const limit = Math.min(parseInt(req.query.limit, 10) || 100, 200);
     const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
     const skip = (page - 1) * limit;
     try {
         const messages = await MessageModel.find({ chatId })
-            .populate("sender", "user_name email")
+            .populate("sender", "_id user_name email avatar")
             .sort({ createdAt: 1 })
             .skip(skip)
             .limit(limit)
             .lean();
 
-        res.json(new ServerResponse(true, messages, "success", null));
+        res.json(new ServerResponse(true, messages, "Messages fetched", null));
     } catch (error) {
         res.status(500).json(new ServerResponse(false, null, error.message, error));
     }
