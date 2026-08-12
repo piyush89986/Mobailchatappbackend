@@ -137,6 +137,11 @@ export const getMyChats = async (req, res) => {
             .sort({ updatedAt: -1 })
             .lean();
 
+        chats = chats.map((c) => ({
+            ...c,
+            status: c.status || "accepted"
+        }));
+
         res.json(new ServerResponse(true, chats, "Chats fetched successfully", null));
     } catch (error) {
         res.status(500).json(new ServerResponse(false, null, error.message, error));
