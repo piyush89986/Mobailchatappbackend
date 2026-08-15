@@ -60,5 +60,5 @@ export const updateUserValidator = [
     body("bio")
         .optional()
         .trim()
-        .isLength({ max: 255 }).withMessage("Bio can't exceed 32 characters")
+        .isLength({ max: 255 }).withMessage("Bio can't exceed 255 characters")
 ];

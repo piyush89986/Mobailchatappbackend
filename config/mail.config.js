@@ -11,6 +11,9 @@ const transpoter = hasCredentials
         user: process.env.EMAIL,
         pass: process.env.PASSWORD,
       },
+      connectionTimeout: 5000, // 5s connection timeout
+      greetingTimeout: 5000,
+      socketTimeout: 5000,
     })
   : {
       verify: async () => {

@@ -103,17 +103,15 @@ export async function addUser(req, res) {
             avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(user_name.trim())}`
         });
 
-        // Fail-safe email notification
-        try {
-            await transpoter.sendMail({
-                from: process.env.EMAIL || "noreply@chatapp.com",
-                to: cleanEmail,
-                subject: "Welcome to ChatSphere!",
-                html: `<h2>Welcome, ${user_name}!</h2><p>Your ChatSphere account has been created successfully.</p>`
-            });
-        } catch (mailErr) {
+        // Fail-safe non-blocking email notification
+        transpoter.sendMail({
+            from: process.env.EMAIL || "noreply@chatapp.com",
+            to: cleanEmail,
+            subject: "Welcome to ChatSphere!",
+            html: `<h2>Welcome, ${user_name}!</h2><p>Your ChatSphere account has been created successfully.</p>`
+        }).catch((mailErr) => {
             console.log("Welcome Mail Notice (non-fatal):", mailErr.message);
-        }
+        });
 
         let createdUserData = newUser.toObject();
         delete createdUserData.password;
