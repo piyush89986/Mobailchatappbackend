@@ -49,6 +49,15 @@ app.use(express.urlencoded({ limit: "50mb", extended: true }));
 app.use(cookieParser());
 app.use(express.static('public'));
 
+// Health check route to wake up / keep backend alive
+app.get('/health', (req, res) => {
+  res.status(200).json({
+    status: 'OK',
+    message: 'Backend server is awake!',
+    timestamp: new Date().toISOString()
+  });
+});
+
 app.use('/', indexRouter);
 app.use('/auth', authRouter);
 app.use('/users', usersRouter);
