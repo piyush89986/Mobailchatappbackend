@@ -1,4 +1,5 @@
 import PostModel from "../models/post.model.js";
+import UserModel from "../models/user.model.js";
 import StoryModel from "../models/story.model.js";
 import NotificationModel from "../models/notification.model.js";
 import ServerResponse from "../response/pattern.js";
