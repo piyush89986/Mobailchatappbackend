@@ -108,8 +108,8 @@ export async function addUser(req, res) {
         transpoter.sendMail({
             from: process.env.EMAIL || "noreply@chatapp.com",
             to: cleanEmail,
-            subject: "Welcome to ChatSphere!",
-            html: `<h2>Welcome, ${user_name}!</h2><p>Your ChatSphere account has been created successfully.</p>`
+            subject: "Welcome to FOMO!",
+            html: `<h2>Welcome, ${user_name}!</h2><p>Your FOMO account has been created successfully.</p>`
         }).catch((mailErr) => {
             console.log("Welcome Mail Notice (non-fatal):", mailErr.message);
         });
