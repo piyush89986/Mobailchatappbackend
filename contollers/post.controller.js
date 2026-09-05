@@ -41,7 +41,7 @@ export const uploadPostMedia = async (req, res) => {
         }
 
         const host = req.get("host");
-        const protocol = req.protocol;
+        const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
         const normalizedPath = req.file.path.replace(/\\/g, "/");
         const fileUrl = `${protocol}://${host}/${normalizedPath}`;
 
@@ -56,13 +56,13 @@ export const uploadPostMedia = async (req, res) => {
     }
 };
 
-// 2. Create Post
+// 2. Create Post / Reel
 export const createPost = async (req, res) => {
-    let { mediaUrl, mediaType = "image", caption = "", location = "" } = req.body;
+    let { mediaUrl, mediaType = "image", isReel = false, caption = "", location = "" } = req.body;
     try {
         if (req.file) {
             const host = req.get("host");
-            const protocol = req.protocol;
+            const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
             mediaUrl = `${protocol}://${host}/${req.file.path.replace(/\\/g, "/")}`;
             if (req.file.mimetype.startsWith("video/")) mediaType = "video";
         }
@@ -75,6 +75,7 @@ export const createPost = async (req, res) => {
             author: req.user.id,
             mediaUrl,
             mediaType,
+            isReel: Boolean(isReel || mediaType === 'video'),
             caption: (caption || "").trim(),
             location: (location || "").trim(),
         });
@@ -227,7 +228,7 @@ export const createStory = async (req, res) => {
     try {
         if (req.file) {
             const host = req.get("host");
-            const protocol = req.protocol;
+            const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
             mediaUrl = `${protocol}://${host}/${req.file.path.replace(/\\/g, "/")}`;
             if (req.file.mimetype.startsWith("video/")) mediaType = "video";
         }

@@ -193,24 +193,24 @@ export async function searchUsers(req, res) {
     const { q } = req.query;
 
     try {
-        if (!q || q.trim() === "") {
-            return res.status(400).json(new ServerResponse(false, null, "Search query is required", null));
-        }
-
-        const cleanQ = q.trim();
-        let regex = new RegExp(cleanQ, "i");
-
-        const users = await User.find({
+        const queryFilter = {
             isDeleted: false,
             _id: { $ne: req.user.id },
-            $or: [
+        };
+
+        if (q && q.trim() !== "") {
+            const cleanQ = q.trim();
+            const regex = new RegExp(cleanQ, "i");
+            queryFilter.$or = [
                 { user_name: { $regex: regex } },
                 { email: { $regex: regex } },
-                { phone: { $regex: regex } }
-            ]
-        })
+                { phone: { $regex: regex } },
+            ];
+        }
+
+        const users = await User.find(queryFilter)
             .select("user_name email phone avatar bio")
-            .limit(20)
+            .limit(30)
             .lean();
 
         return res.status(200).json(new ServerResponse(true, users, "Users found", null));

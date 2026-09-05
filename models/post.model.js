@@ -34,6 +34,10 @@ const postSchema = new Schema(
             enum: ["image", "video"],
             default: "image",
         },
+        isReel: {
+            type: Boolean,
+            default: false,
+        },
         caption: {
             type: String,
             trim: true,
