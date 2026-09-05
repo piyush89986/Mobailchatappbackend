@@ -33,20 +33,50 @@ export const getFeedPosts = async (req, res) => {
     }
 };
 
+// Upload Post Media File (Multipart)
+export const uploadPostMedia = async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json(new ServerResponse(false, null, "No media file uploaded", null));
+        }
+
+        const host = req.get("host");
+        const protocol = req.protocol;
+        const normalizedPath = req.file.path.replace(/\\/g, "/");
+        const fileUrl = `${protocol}://${host}/${normalizedPath}`;
+
+        return res.status(200).json(new ServerResponse(true, {
+            url: fileUrl,
+            path: normalizedPath,
+            mediaType: req.file.mimetype.startsWith("video/") ? "video" : "image"
+        }, "Media uploaded successfully", null));
+    } catch (error) {
+        console.error("Upload error:", error);
+        return res.status(500).json(new ServerResponse(false, null, error.message, error));
+    }
+};
+
 // 2. Create Post
 export const createPost = async (req, res) => {
-    const { mediaUrl, mediaType = "image", caption = "", location = "" } = req.body;
+    let { mediaUrl, mediaType = "image", caption = "", location = "" } = req.body;
     try {
+        if (req.file) {
+            const host = req.get("host");
+            const protocol = req.protocol;
+            mediaUrl = `${protocol}://${host}/${req.file.path.replace(/\\/g, "/")}`;
+            if (req.file.mimetype.startsWith("video/")) mediaType = "video";
+        }
+
         if (!mediaUrl) {
-            return res.status(400).json(new ServerResponse(false, null, "mediaUrl is required", null));
+            return res.status(400).json(new ServerResponse(false, null, "mediaUrl or media file is required", null));
         }
 
         const newPost = await PostModel.create({
             author: req.user.id,
             mediaUrl,
             mediaType,
-            caption: caption.trim(),
-            location: location.trim(),
+            caption: (caption || "").trim(),
+            location: (location || "").trim(),
         });
 
         const fullPost = await PostModel.findById(newPost._id)
@@ -55,6 +85,7 @@ export const createPost = async (req, res) => {
 
         res.status(201).json(new ServerResponse(true, fullPost, "Post created successfully", null));
     } catch (error) {
+        console.error("Create post error:", error);
         res.status(500).json(new ServerResponse(false, null, error.message, error));
     }
 };
@@ -192,25 +223,33 @@ export const getStories = async (req, res) => {
 
 // 7. Create Story
 export const createStory = async (req, res) => {
-    const { mediaUrl, mediaType = "image", caption = "" } = req.body;
+    let { mediaUrl, mediaType = "image", caption = "" } = req.body;
     try {
+        if (req.file) {
+            const host = req.get("host");
+            const protocol = req.protocol;
+            mediaUrl = `${protocol}://${host}/${req.file.path.replace(/\\/g, "/")}`;
+            if (req.file.mimetype.startsWith("video/")) mediaType = "video";
+        }
+
         if (!mediaUrl) {
-            return res.status(400).json(new ServerResponse(false, null, "mediaUrl is required", null));
+            return res.status(400).json(new ServerResponse(false, null, "mediaUrl or media file is required", null));
         }
 
         const story = await StoryModel.create({
             user: req.user.id,
             mediaUrl,
             mediaType,
-            caption,
+            caption: (caption || "").trim(),
         });
 
         const fullStory = await StoryModel.findById(story._id)
             .populate("user", "_id user_name avatar")
             .lean();
 
-        res.status(201).json(new ServerResponse(true, fullStory, "Story posted", null));
+        res.status(201).json(new ServerResponse(true, fullStory, "Story posted successfully", null));
     } catch (error) {
+        console.error("Create story error:", error);
         res.status(500).json(new ServerResponse(false, null, error.message, error));
     }
 };
