@@ -29,7 +29,9 @@ const corsOptions = {
       isLocalhost ||
       isVercelOrRender ||
       allowedOrigins.length === 0 ||
-      allowedOrigins.includes(requestOrigin)
+      allowedOrigins.includes('*') ||
+      allowedOrigins.includes(requestOrigin) ||
+      allowedOrigins.some((ao) => requestOrigin.includes(ao) || ao.includes(requestOrigin))
     ) {
       return callback(null, true);
     }
