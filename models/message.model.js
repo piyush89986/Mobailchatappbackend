@@ -33,7 +33,7 @@ const messageSchema = new Schema({
     message: {
         type: String,
         trim: true,
-        minLength: [1, "Blank message"],
+        default: "",
     },
     attechment: [attechmentSchema],
     seen: [
