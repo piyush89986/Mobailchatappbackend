@@ -9,6 +9,10 @@ dotenv.config();
  * @returns {typeof cloudinary | null}
  */
 export const getCloudinaryClient = () => {
+  if (process.env.CLOUDINARY_URL) {
+    return cloudinary;
+  }
+
   const cloud_name = process.env.CLOUDINARY_CLOUD_NAME;
   const api_key = process.env.CLOUDINARY_API_KEY;
   const api_secret = process.env.CLOUDINARY_API_SECRET;
