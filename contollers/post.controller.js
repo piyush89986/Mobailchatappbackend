@@ -4,13 +4,53 @@ import NotificationModel from "../models/notification.model.js";
 import ServerResponse from "../response/pattern.js";
 import { uploadToCloudinary } from "../config/cloudinary.config.js";
 
-// 1. Get Feed Posts
+// In-memory cache for Imgflip Memes to keep performance instant
+let cachedMemes = [];
+let lastMemeFetchTime = 0;
+const MEME_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+
+// In-memory like tracker for virtual meme posts: key is `${userId}_${postId}`
+const memeLikesMap = new Map();
+
+// Virtual Creators / Meme pages on FOMO
+const MEME_CREATORS = [
+    { name: "dank_memer", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=dankmemer", bio: "Chief Meme Officer 😂" },
+    { name: "fomo_comedy", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=fomocomedy", bio: "Laughing at FOMO daily 🔥" },
+    { name: "sarcasm_society", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=sarcasmsociety", bio: "High quality sarcasm only ☕" },
+    { name: "daily_laughs", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=dailylaughs", bio: "Your daily dose of smiles ✨" },
+    { name: "meme_lord_official", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=memelordofficial", bio: "Living rent-free in your feed 🚀" },
+    { name: "relatable_af", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=relatableaf", bio: "Too relatable to ignore 💀" }
+];
+
+async function fetchImgflipMemes() {
+    const now = Date.now();
+    if (cachedMemes.length > 0 && now - lastMemeFetchTime < MEME_CACHE_DURATION) {
+        return cachedMemes;
+    }
+
+    try {
+        const response = await fetch("https://api.imgflip.com/get_memes");
+        const json = await response.json();
+        if (json && json.success && json.data && Array.isArray(json.data.memes)) {
+            cachedMemes = json.data.memes;
+            lastMemeFetchTime = now;
+            return cachedMemes;
+        }
+    } catch (e) {
+        console.error("Imgflip fetch notice (safe fallback):", e.message);
+    }
+    return cachedMemes;
+}
+
+// 1. Get Feed Posts (Combines Real MongoDB Posts + Live Imgflip Memes)
 export const getFeedPosts = async (req, res) => {
     try {
         const page = Math.max(parseInt(req.query.page, 10) || 1, 1);
         const limit = Math.min(parseInt(req.query.limit, 10) || 20, 50);
         const skip = (page - 1) * limit;
+        const currentUserId = req.user?.id || "guest";
 
+        // 1. Fetch real posts from MongoDB
         const posts = await PostModel.find()
             .populate("author", "_id user_name email avatar bio")
             .populate("comments.user", "_id user_name avatar")
@@ -19,8 +59,7 @@ export const getFeedPosts = async (req, res) => {
             .limit(limit)
             .lean();
 
-        const currentUserId = req.user.id;
-        const formattedPosts = posts.map((post) => ({
+        const formattedRealPosts = posts.map((post) => ({
             ...post,
             likesCount: post.likes ? post.likes.length : 0,
             commentsCount: post.comments ? post.comments.length : 0,
@@ -28,7 +67,53 @@ export const getFeedPosts = async (req, res) => {
             isSavedByMe: post.savedBy ? post.savedBy.some((id) => id.toString() === currentUserId.toString()) : false,
         }));
 
-        res.json(new ServerResponse(true, formattedPosts, "Feed posts fetched", null));
+        // 2. Fetch virtual memes from Imgflip (Zero DB Storage, 100% on-the-fly)
+        let memePosts = [];
+        try {
+            const rawMemes = await fetchImgflipMemes();
+            if (rawMemes && rawMemes.length > 0) {
+                // Paginate memes so scrolling shows more memes
+                const memeSkip = (page - 1) * 15;
+                const pageMemes = rawMemes.slice(memeSkip, memeSkip + 15);
+
+                memePosts = pageMemes.map((meme, idx) => {
+                    const creator = MEME_CREATORS[(memeSkip + idx) % MEME_CREATORS.length];
+                    const memePostId = `meme_${meme.id}`;
+                    const isLiked = memeLikesMap.has(`${currentUserId}_${memePostId}`);
+                    const baseLikes = ((parseInt(meme.id, 10) || 100) % 200) + 45;
+
+                    return {
+                        _id: memePostId,
+                        author: {
+                            _id: `creator_${creator.name}`,
+                            user_name: creator.name,
+                            avatar: creator.avatar,
+                            bio: creator.bio,
+                        },
+                        mediaUrl: meme.url,
+                        mediaType: "image",
+                        isReel: false,
+                        caption: meme.name,
+                        location: "Meme Central",
+                        likes: isLiked ? [currentUserId] : [],
+                        likesCount: isLiked ? baseLikes + 1 : baseLikes,
+                        comments: [],
+                        commentsCount: ((parseInt(meme.id, 10) || 5) % 20) + 2,
+                        sharesCount: ((parseInt(meme.id, 10) || 2) % 12) + 1,
+                        isLikedByMe: isLiked,
+                        isSavedByMe: false,
+                        createdAt: new Date(Date.now() - ((memeSkip + idx) * 15 * 60 * 1000)),
+                    };
+                });
+            }
+        } catch (mErr) {
+            console.error("Meme integration notice (non-fatal):", mErr.message);
+        }
+
+        // 3. Merge: Real posts first, followed by fresh memes!
+        const allPosts = [...formattedRealPosts, ...memePosts];
+
+        res.json(new ServerResponse(true, allPosts, "Feed posts fetched", null));
     } catch (error) {
         res.status(500).json(new ServerResponse(false, null, error.message, error));
     }
@@ -113,6 +198,29 @@ export const toggleLikePost = async (req, res) => {
     const { postId } = req.params;
     const userId = req.user.id;
     try {
+        // Virtual Meme Post like handling (Instant, In-Memory)
+        if (postId && postId.startsWith("meme_")) {
+            const likeKey = `${userId}_${postId}`;
+            const wasLiked = memeLikesMap.has(likeKey);
+            if (wasLiked) {
+                memeLikesMap.delete(likeKey);
+            } else {
+                memeLikesMap.set(likeKey, true);
+            }
+            const baseLikes = 142;
+            return res.json(
+                new ServerResponse(
+                    true,
+                    {
+                        liked: !wasLiked,
+                        likesCount: !wasLiked ? baseLikes + 1 : baseLikes,
+                    },
+                    !wasLiked ? "Post liked" : "Post unliked",
+                    null
+                )
+            );
+        }
+
         const post = await PostModel.findById(postId);
         if (!post) {
             return res.status(404).json(new ServerResponse(false, null, "Post not found", null));
@@ -167,6 +275,28 @@ export const addComment = async (req, res) => {
     try {
         if (!text || text.trim() === "") {
             return res.status(400).json(new ServerResponse(false, null, "Comment text required", null));
+        }
+
+        // Virtual Meme Post comment handling (Instant)
+        if (postId && postId.startsWith("meme_")) {
+            const mockComment = {
+                _id: `comment_${Date.now()}`,
+                user: {
+                    _id: userId,
+                    user_name: req.user?.user_name || "You",
+                    avatar: req.user?.avatar || "https://api.dicebear.com/7.x/avataaars/svg?seed=user",
+                },
+                text: text.trim(),
+                createdAt: new Date(),
+            };
+            return res.status(201).json(
+                new ServerResponse(
+                    true,
+                    [mockComment],
+                    "Comment added successfully",
+                    null
+                )
+            );
         }
 
         const post = await PostModel.findById(postId);
