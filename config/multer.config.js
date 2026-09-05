@@ -11,15 +11,12 @@ const imageStorage = multer.diskStorage({
         if (file.fieldname === "avatar") {
             cb(null, "uploads/images");
         } else {
-            cb(null, "uploads/temp/")
+            cb(null, "uploads/temp/");
         }
     },
     filename: (req, file, cb) => {
-        if (file.fieldname === "avatar") {
-            cb(null, Date.now() + "_" + (req.userData?.user_name || "user") + "." + file.mimetype.split("/")[1])
-        } else {
-            cb(null, file.originalname)
-        }
+        const ext = file.mimetype ? (file.mimetype.split("/")[1] || 'jpg') : 'jpg';
+        cb(null, `avatar_${Date.now()}_${Math.round(Math.random() * 1e6)}.${ext}`);
     }
 });
 
@@ -28,18 +25,33 @@ const postStorage = multer.diskStorage({
         cb(null, "uploads/posts");
     },
     filename: (req, file, cb) => {
-        const ext = file.originalname.split('.').pop() || 'jpg';
+        let ext = 'jpg';
+        if (file.mimetype && file.mimetype.startsWith('video/')) {
+            ext = file.mimetype.split('/')[1] || 'mp4';
+        } else if (file.mimetype && file.mimetype.startsWith('image/')) {
+            ext = file.mimetype.split('/')[1] || 'jpg';
+        } else if (file.originalname && file.originalname.includes('.')) {
+            ext = file.originalname.split('.').pop();
+        }
         cb(null, `post_${Date.now()}_${Math.round(Math.random() * 1e6)}.${ext}`);
     }
 });
 
 const mediaFileFilter = (req, file, cb) => {
-    if (file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/")) {
+    if (file.mimetype && (file.mimetype.startsWith("image/") || file.mimetype.startsWith("video/"))) {
         cb(null, true);
     } else {
         cb(new Error("Only image and video files are supported"));
     }
 };
 
-export const ImageUpload = multer({ storage: imageStorage, limits: 1024 * 1024 * 10 });
-export const PostMediaUpload = multer({ storage: postStorage, fileFilter: mediaFileFilter, limits: 1024 * 1024 * 50 });
+export const ImageUpload = multer({ 
+    storage: imageStorage, 
+    limits: { fileSize: 25 * 1024 * 1024 } 
+});
+
+export const PostMediaUpload = multer({ 
+    storage: postStorage, 
+    fileFilter: mediaFileFilter, 
+    limits: { fileSize: 100 * 1024 * 1024 } 
+});

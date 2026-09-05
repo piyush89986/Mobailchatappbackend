@@ -4,6 +4,7 @@ import { generateToken } from '../config/jwt.config.js';
 import ServerResponse from '../response/pattern.js';
 import fs from "fs";
 import transpoter from '../config/mail.config.js';
+import { uploadToCloudinary } from '../config/cloudinary.config.js';
 import { config } from 'dotenv';
 config();
 
@@ -165,10 +166,16 @@ export async function uploadDp(req, res) {
             return res.status(400).json(new ServerResponse(false, null, "No image uploaded", null));
         }
 
-        const host = req.get("host") || "localhost:4000";
-        const protocol = req.protocol || "http";
-        const relativePath = req.file.path.replace(/\\/g, "/");
-        let imageUrl = `${protocol}://${host}/${relativePath}`;
+        let imageUrl = null;
+        const cloudResult = await uploadToCloudinary(req.file.path, "fomo_avatars");
+        if (cloudResult && cloudResult.url) {
+            imageUrl = cloudResult.url;
+        } else {
+            const host = req.get("host") || "localhost:4000";
+            const protocol = req.headers['x-forwarded-proto'] || req.protocol || "https";
+            const relativePath = req.file.path.replace(/\\/g, "/");
+            imageUrl = `${protocol}://${host}/${relativePath}`;
+        }
 
         const user = await User.findByIdAndUpdate(req.user.id, { avatar: imageUrl }, { new: true }).select("-password -__v");
 

@@ -2,6 +2,7 @@ import PostModel from "../models/post.model.js";
 import StoryModel from "../models/story.model.js";
 import NotificationModel from "../models/notification.model.js";
 import ServerResponse from "../response/pattern.js";
+import { uploadToCloudinary } from "../config/cloudinary.config.js";
 
 // 1. Get Feed Posts
 export const getFeedPosts = async (req, res) => {
@@ -33,22 +34,32 @@ export const getFeedPosts = async (req, res) => {
     }
 };
 
-// Upload Post Media File (Multipart)
+// Upload Post Media File (Cloudinary + Local Fallback)
 export const uploadPostMedia = async (req, res) => {
     try {
         if (!req.file) {
             return res.status(400).json(new ServerResponse(false, null, "No media file uploaded", null));
         }
 
-        const host = req.get("host");
-        const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-        const normalizedPath = req.file.path.replace(/\\/g, "/");
-        const fileUrl = `${protocol}://${host}/${normalizedPath}`;
+        let fileUrl = null;
+        let detectedMediaType = req.file.mimetype.startsWith("video/") ? "video" : "image";
+
+        // 1. Try Cloudinary
+        const cloudResult = await uploadToCloudinary(req.file.path, "fomo_media");
+        if (cloudResult && cloudResult.url) {
+            fileUrl = cloudResult.url;
+            if (cloudResult.resource_type === "video") detectedMediaType = "video";
+        } else {
+            // 2. Fallback to local server path
+            const host = req.get("host");
+            const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+            const normalizedPath = req.file.path.replace(/\\/g, "/");
+            fileUrl = `${protocol}://${host}/${normalizedPath}`;
+        }
 
         return res.status(200).json(new ServerResponse(true, {
             url: fileUrl,
-            path: normalizedPath,
-            mediaType: req.file.mimetype.startsWith("video/") ? "video" : "image"
+            mediaType: detectedMediaType,
         }, "Media uploaded successfully", null));
     } catch (error) {
         console.error("Upload error:", error);
@@ -61,10 +72,16 @@ export const createPost = async (req, res) => {
     let { mediaUrl, mediaType = "image", isReel = false, caption = "", location = "" } = req.body;
     try {
         if (req.file) {
-            const host = req.get("host");
-            const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-            mediaUrl = `${protocol}://${host}/${req.file.path.replace(/\\/g, "/")}`;
-            if (req.file.mimetype.startsWith("video/")) mediaType = "video";
+            const cloudResult = await uploadToCloudinary(req.file.path, isReel ? "fomo_reels" : "fomo_posts");
+            if (cloudResult && cloudResult.url) {
+                mediaUrl = cloudResult.url;
+                if (cloudResult.resource_type === "video") mediaType = "video";
+            } else {
+                const host = req.get("host");
+                const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+                mediaUrl = `${protocol}://${host}/${req.file.path.replace(/\\/g, "/")}`;
+                if (req.file.mimetype.startsWith("video/")) mediaType = "video";
+            }
         }
 
         if (!mediaUrl) {
@@ -227,10 +244,16 @@ export const createStory = async (req, res) => {
     let { mediaUrl, mediaType = "image", caption = "" } = req.body;
     try {
         if (req.file) {
-            const host = req.get("host");
-            const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-            mediaUrl = `${protocol}://${host}/${req.file.path.replace(/\\/g, "/")}`;
-            if (req.file.mimetype.startsWith("video/")) mediaType = "video";
+            const cloudResult = await uploadToCloudinary(req.file.path, "fomo_stories");
+            if (cloudResult && cloudResult.url) {
+                mediaUrl = cloudResult.url;
+                if (cloudResult.resource_type === "video") mediaType = "video";
+            } else {
+                const host = req.get("host");
+                const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+                mediaUrl = `${protocol}://${host}/${req.file.path.replace(/\\/g, "/")}`;
+                if (req.file.mimetype.startsWith("video/")) mediaType = "video";
+            }
         }
 
         if (!mediaUrl) {
