@@ -10,8 +10,10 @@ import cors from "cors"
 import indexRouter from './routes/index.js';
 import usersRouter from './routes/users.js';
 import authRouter from './routes/auth.route.js';
-import chatRouter from './routes/chat.js'
+import chatRouter from './routes/chat.js';
 import postRouter from './routes/post.js';
+import musicRouter from './routes/music.route.js';
+import { autoSeedCatalog } from './contollers/music.controller.js';
 
 const app = express();
 const normalizeOrigin = (value = '') => value.trim().replace(/\/$/, '');
@@ -66,7 +68,11 @@ app.use('/auth', authRouter);
 app.use('/users', usersRouter);
 app.use('/chat', chatRouter);
 app.use('/posts', postRouter);
+app.use('/music', musicRouter);
 app.use("/uploads", express.static('uploads'));
+
+// Seed music data asynchronously in background
+autoSeedCatalog().catch((err) => console.log('Music seed error:', err.message));
 
 
 

@@ -20,7 +20,7 @@ const MEME_CREATORS = [
     { name: "sarcasm_society", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=sarcasmsociety", bio: "High quality sarcasm only ☕" },
     { name: "daily_laughs", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=dailylaughs", bio: "Your daily dose of smiles ✨" },
     { name: "meme_lord_official", avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=memelordofficial", bio: "Living rent-free in your feed 🚀" },
-    { name: "relatable_af", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=relatableaf", bio: "Too relatable to ignore 💀" }
+    { name: "alelelele", avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=relatableaf", bio: "Too relatable to ignore 💀" }
 ];
 
 async function fetchImgflipMemes() {
