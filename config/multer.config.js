@@ -55,3 +55,23 @@ export const PostMediaUpload = multer({
     fileFilter: mediaFileFilter, 
     limits: { fileSize: 100 * 1024 * 1024 } 
 });
+
+const songStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, "uploads/temp/");
+    },
+    filename: (req, file, cb) => {
+        let ext = 'mp3';
+        if (file.mimetype && file.mimetype.startsWith('image/')) {
+            ext = file.mimetype.split('/')[1] || 'jpg';
+        } else if (file.originalname && file.originalname.includes('.')) {
+            ext = file.originalname.split('.').pop();
+        }
+        cb(null, `song_${Date.now()}_${Math.round(Math.random() * 1e6)}.${ext}`);
+    }
+});
+
+export const SongUpload = multer({
+    storage: songStorage,
+    limits: { fileSize: 50 * 1024 * 1024 }
+});

@@ -13,8 +13,11 @@ import {
   toggleFollowArtist,
   getUserLibrary,
   autoSeedCatalog,
+  getCollectionSongs,
+  uploadCustomSong,
 } from '../contollers/music.controller.js';
 import { authMiddlewareOnlyForUser } from '../middleware/auth.middleware.js';
+import { SongUpload } from '../config/multer.config.js';
 
 const router = express.Router();
 
@@ -31,8 +34,19 @@ router.post('/seed', async (req, res) => {
 // Protected routes
 router.use(authMiddlewareOnlyForUser);
 
-// Home feed
+// Upload custom music
+router.post(
+  '/upload',
+  SongUpload.fields([
+    { name: 'audio', maxCount: 1 },
+    { name: 'cover', maxCount: 1 },
+  ]),
+  uploadCustomSong
+);
+
+// Home feed & Collections
 router.get('/home', getHomeMusicFeed);
+router.get('/collection-songs', getCollectionSongs);
 
 // Search
 router.get('/search', searchMusic);
