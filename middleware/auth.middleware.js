@@ -28,7 +28,7 @@ export async function authMiddlewareOnlyForUser(req, res, next) {
 
         next()
     } catch (error) {
-        return res.status(403).json({ message: error.message })
+        return res.status(401).json({ message: error.message || 'Invalid or expired token' })
     }
 
 
